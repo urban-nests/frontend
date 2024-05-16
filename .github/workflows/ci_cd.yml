@@ -1,0 +1,64 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
+
+name: Node.js CI/CD
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+
+jobs:
+  # job의 이름 설정
+  deploy:
+    # 해당 job을 실행하는 운영 체제
+    runs-on: ubuntu-latest
+
+    # 수행할 동작 정의
+    steps:
+      # 1. 저장소 체크아웃
+      - name: Checkout source code
+        uses: actions/checkout@main
+
+      # 2. node.js 환경설정
+      - name: Set up Node.js
+        uses: actions/setup-node@main
+        with:
+          node-version: 22.x
+
+      # 3. 패키지 설치
+      - name: Install dependencies
+        run: npm install
+
+      # 4. 빌드
+      - name: Build Page
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      # 5. 압축
+      - name: Package Application
+        run: tar -czvf build.tar.gz ./dist
+
+      # 6. 인스턴스에 옮기기
+      - name: scp to Instance
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USERNAME }}
+          key: ${{ secrets.KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          source: build.tar.gz
+          target: ${{ secrets.DEPLOY_PATH }}
+
+      # 7. unzip 쉡 스크립트 실행
+      - name: execute shell script
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USERNAME }}
+          key: ${{ secrets.KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            sh ${{ secrets.DEPLOY_SCRIPT_PATH }}/unzip.sh
